@@ -11,10 +11,25 @@ from pathlib import Path
 DIR = os.path.dirname(__file__)
 
 
+def libero_asset_path(old_path):
+    """Map a LIBERO asset path recorded on another machine (.../chiliocosm/assets/<rest> or
+    .../libero/assets/<rest>) to the same file in this installation's assets folder.
+    Returns None if the path is not a LIBERO asset path or the file does not exist here."""
+    parts = old_path.replace("\\", "/").split("/")
+    idx = [k for k in range(1, len(parts)) if parts[k] == "assets" and parts[k - 1] in ("chiliocosm", "libero")]
+    if not idx:
+        return None
+    from libero.libero import get_libero_path
+
+    new_path = os.path.normpath(os.path.join(get_libero_path("assets"), *parts[idx[-1] + 1 :]))
+    return new_path if os.path.exists(new_path) else None
+
+
 def postprocess_model_xml(xml_str, cameras_dict={}):
     """
     This function postprocesses the model.xml collected from a MuJoCo demonstration
-    in order to make sure that the STL files can be found.
+    in order to make sure that the STL files can be found: robosuite asset paths are mapped to the
+    installed robosuite, LIBERO asset paths (libero_asset_path) to this installation's assets.
 
     Args:
         xml_str (str): Mujoco sim demonstration XML file as string
@@ -40,6 +55,9 @@ def postprocess_model_xml(xml_str, cameras_dict={}):
             continue
         old_path_split = old_path.split("/")
         if "robosuite" not in old_path_split:
+            new_path = libero_asset_path(old_path)
+            if new_path is not None:
+                elem.set("file", new_path)
             continue
         ind = max(
             loc for loc, val in enumerate(old_path_split) if val == "robosuite"
