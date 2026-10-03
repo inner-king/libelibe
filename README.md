@@ -1,3 +1,8 @@
+> **This repository is a fork of [Zxy-MLlab/LIBERO-PRO](https://github.com/Zxy-MLlab/LIBERO-PRO) (master `eafdb80`).**
+> It runs on Python 3.14, torch 2.14 and mujoco 3.14, and adds the runtime patch `libero/libero/envs/mujoco_compat/`, which
+> reproduces mujoco 2.3.7 physics (LIBERO init states and demos were made with mujoco 2.3.x) on mujoco 3.14.
+> Installation, changes and verification: [PORTING_PY314.md](PORTING_PY314.md).
+
 <div align="center">
 
 <img src="https://github.com/Zxy-MLlab/LIBERO-OOD/blob/master/images/liberopro_logo.png" width="360">
