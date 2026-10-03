@@ -1,7 +1,9 @@
 > **This repository is a fork of [Zxy-MLlab/LIBERO-PRO](https://github.com/Zxy-MLlab/LIBERO-PRO) (master `eafdb80`).**
-> It runs on Python 3.14, torch 2.14 and mujoco 3.14, and adds the runtime patch `libero/libero/envs/mujoco_compat/`, which
-> reproduces mujoco 2.3.7 physics (LIBERO init states and demos were made with mujoco 2.3.x) on mujoco 3.14.
-> Installation, changes and verification: [PORTING_PY314.md](PORTING_PY314.md).
+> It runs on Python 3.14, torch 2.14, mujoco 3.14 and unmodified robosuite 1.4.0. By default it uses native mujoco 3.14
+> physics with LIBERO-PRO init states settled for it (`libero/libero/init_files_mj314/`), and provides a script to
+> regenerate the LIBERO demos under mujoco 3.x. An optional mode (`LIBERO_MUJOCO_COMPAT=1`) reproduces mujoco 2.3.7
+> physics with the original init states. The four original LIBERO suites and libero_90 have no settled init states and
+> keep the original ones. Installation, changes and verification: [PORTING_PY314.md](PORTING_PY314.md).
 
 <div align="center">
 
