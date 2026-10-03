@@ -1,3 +1,7 @@
+from .mujoco_compat import install as _install_mujoco_compat
+
+_install_mujoco_compat()
+
 from .bddl_base_domain import TASK_MAPPING
 from .base_object import OBJECTS_DICT
 from .problems import *
