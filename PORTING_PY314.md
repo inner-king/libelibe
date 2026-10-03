@@ -48,10 +48,24 @@ LIBERO suites (spatial/object/goal/10) and libero_90 are in git.
 | `libero/libero/benchmark/__init__.py:273` | `torch.load(..., weights_only=False)` | With the torch >= 2.6 default `weights_only=True`, loading the init files fails with UnpicklingError |
 | `libero/libero/envs/env_wrapper.py` `ControlEnv.reset` | removed the 2-line `finally: continue` | Python 3.14 PEP 765 SyntaxWarning. Behaviour change: before, every exception (KeyboardInterrupt included) was swallowed and retried forever; now only `RandomizationError` is retried |
 | `libero/__init__.py` (new, empty) | added | Without it the editable-install finder maps no package and `import libero` fails outside the repo root |
-| `libero/libero/envs/__init__.py`, first 3 lines | calls `mujoco_compat.install()` | §3 |
+| `libero/libero/envs/__init__.py`, first 5 lines | calls `robosuite_compat.apply()` and `mujoco_compat.install()` | §2.1, §3 |
+| `libero/libero/envs/robosuite_compat.py` (new) | replaces three robosuite 1.4.0 methods at import | §2.1 |
 | `libero/libero/envs/mujoco_compat/` (new) | `__init__.py`, `compat_237.c`, `LICENSE`, `.gitignore` | §3. `compat_237.c` is derived from mujoco 2.3.7 and is Apache-2.0; `LICENSE` is that license text (the rest of the repo is MIT). The build output `_compat_237-*.so` is git-ignored |
 | `scripts/check_mujoco_compat.py` (new) | install check | §1, §4 |
 | `requirements-py314.txt` (new) | `uv pip freeze` of the validated environment | §1 |
+
+### 2.1 robosuite 1.4.0 on mujoco 3.x (`robosuite_compat.py`)
+
+robosuite 1.4.0 from PyPI, unmodified, fails on mujoco 3.14 in two code paths that LIBERO uses:
+
+| robosuite 1.4.0 code | Failure on mujoco 3.14 | Replacement |
+|---|---|---|
+| `MjModel.get_joint_qpos_addr`, `get_joint_qvel_addr`: `assert joint_type in (mjtJoint.mjJNT_HINGE, mjtJoint.mjJNT_SLIDE)` | a numpy integer never matches the 3.x pybind11 enums in a tuple membership test, so env construction raises AssertionError at the first hinge/slide joint | the same check on ints |
+| `Controller.update`: `mujoco.mj_fullM(model, mass_matrix, data.qM)` | the 3.x signature is `mj_fullM(m, d, dst)` and `MjData` has no `qM` | `mujoco.mj_fullM(model, data, mass_matrix)` |
+
+`robosuite_compat.apply()` replaces these three methods with copies that differ from robosuite 1.4.0 only in the lines
+above (robosuite MIT notice kept in the file). It runs regardless of `LIBERO_MUJOCO_COMPAT`, and each fix is applied
+only when the installed mujoco needs it. No installed package file is modified.
 
 ## 3. On mujoco 3.14 the LIBERO scene changes before the policy acts
 
@@ -134,6 +148,7 @@ bit-identical results when rerun on the same input.
 | Demos whose success differs from 2.3.7 | compat 6; 2.3.7 perturbed by +-1e-9, 3 runs: 4 / 4 / 6; 3.14 native 39 |
 | Final object position difference, median / p90 | compat 0.22 / 5.61 mm; 2.3.7 noise 0.00-0.01 / 3.3-4.1 mm; 2.3.7 perturbed by 1e-6: 0.25 / 5.90 mm; 3.14 native 5.19 / 44.55 mm |
 | SubprocVectorEnv (forkserver / spawn / fork), DummyVectorEnv | worker results bit-identical to in-process results |
+| Unmodified robosuite 1.4.0 from PyPI + `robosuite_compat` | settle (290 tasks) and replay (400 demos) bit-identical to the runs above |
 | Speed | median `env.step` +2-6% (`libero_10` task 0 5.52 -> 5.66 ms, `libero_spatial` task 0 7.62 -> 8.08 ms, pinned to one CPU core) |
 
 The two remaining settle pairs (`libero_90` task 5 init 15: 6.35 mm; `libero_spatial_task` task 0 init 46: 0.38 mm)
