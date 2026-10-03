@@ -122,8 +122,40 @@ class ControlEnv:
     def _update_observables(self, force=False):
         self.env._update_observables(force=force)
 
+    def get_fixture_poses(self):
+        """Pose of every fixture root body (pos xyz + quat wxyz), sorted by fixture name, flattened.
+
+        env.reset() places fixtures (stove, cabinets, wine rack, ...) by writing model.body_pos and
+        model.body_quat, so their pose is not part of get_sim_state() (time, qpos, qvel). The init states
+        settled for mujoco 3.x (init_files_mj314) append these values to the sim state."""
+        model = self.env.sim.model
+        poses = []
+        for name in sorted(getattr(self.env, "fixtures_dict", {})):
+            body = model.body_name2id(self.env.fixtures_dict[name].root_body)
+            poses.append(np.concatenate([model.body_pos[body], model.body_quat[body]]))
+        return np.concatenate(poses) if poses else np.zeros(0)
+
+    def set_fixture_poses(self, poses):
+        model = self.env.sim.model
+        names = sorted(getattr(self.env, "fixtures_dict", {}))
+        poses = np.asarray(poses, dtype=np.float64)
+        if poses.shape != (7 * len(names),):
+            raise ValueError(
+                f"state has {poses.size} values after time/qpos/qvel; expected 7 per fixture "
+                f"({len(names)} fixtures: {names})"
+            )
+        for k, name in enumerate(names):
+            body = model.body_name2id(self.env.fixtures_dict[name].root_body)
+            model.body_pos[body] = poses[7 * k : 7 * k + 3]
+            model.body_quat[body] = poses[7 * k + 3 : 7 * k + 7]
+
     def set_state(self, mujoco_state):
-        self.env.sim.set_state_from_flattened(mujoco_state)
+        # [time, qpos, qvel] as from get_sim_state(), optionally followed by get_fixture_poses()
+        mujoco_state = np.asarray(mujoco_state)
+        n = 1 + self.env.sim.model.nq + self.env.sim.model.nv
+        if mujoco_state.shape[0] > n:
+            self.set_fixture_poses(mujoco_state[n:])
+        self.env.sim.set_state_from_flattened(mujoco_state[:n])
 
     def reset_from_xml_string(self, xml_string):
         self.env.reset_from_xml_string(xml_string)

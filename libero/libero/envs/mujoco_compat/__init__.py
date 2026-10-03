@@ -27,13 +27,16 @@ install() changes the current process as follows:
 The patches are process-global, so every process that steps a simulation needs them, and
 every MjModel/MjData stepped through mujoco.mj_step/mj_forward/mj_step1 in the process gets its
 qpos and mocap quaternions normalized in place.
-libero.libero.envs calls install() on import, so SubprocVectorEnv workers that import LIBERO get
-them as well. Code that binds the functions before install() (from mujoco import mj_step) or
-calls other kinematics entry points (mj_kinematics, mj_fwdPosition, mj_forwardSkip) skips (4).
+libero.libero.envs calls install() on import (a no-op unless LIBERO_MUJOCO_COMPAT enables it),
+so SubprocVectorEnv workers that import LIBERO get the same setting. Code that binds the functions
+before install() (from mujoco import mj_step) or calls other kinematics entry points (mj_kinematics,
+mj_fwdPosition, mj_forwardSkip) skips (4).
 
-LIBERO_MUJOCO_COMPAT: unset, "", "1", "on", "true", "yes" = on; "0", "false", "off", "no" =
-native mujoco physics; "force" = also install on mujoco versions newer than the allowed range
-(3.9.0-3.14.x; only 3.14.0 was validated). Any other value warns and means on.
+LIBERO_MUJOCO_COMPAT: unset, "", "0", "false", "off", "no" = native mujoco physics (default);
+"1", "on", "true", "yes" = install the 2.3.7 compat patch; "force" = also install on mujoco versions
+newer than the allowed range (3.9.0-3.14.x; only 3.14.0 was validated). Any other value warns and
+means off. With native physics on mujoco >= 3.4, the benchmark loads the init states settled for
+mujoco 3.x (libero/libero/init_files_mj314) where they exist; see benchmark.get_task_init_states.
 """
 
 import ctypes
@@ -58,7 +61,7 @@ _CFLAGS = ("-O2", "-ffp-contract=off", "-fPIC", "-shared")
 _TESTED = ((3, 9, 0), (3, 15, 0))
 _WRAPPED = ("mj_step", "mj_forward", "mj_step1")
 _MARK = "_libero_mujoco_compat"
-_HINT = f"Set {_ENV_VAR}=0 to run with native mujoco physics."
+_HINT = f"Unset {_ENV_VAR} (or set it to 0) to run with native mujoco physics."
 
 _lock = threading.Lock()
 _state = {"installed": False, "mode": None, "so": None, "lib": None, "fn": None}
@@ -70,14 +73,14 @@ def _version():
 
 
 def _mode():
-    value = os.environ.get(_ENV_VAR, "1").strip().lower()
-    if value in ("0", "false", "off", "no"):
-        return "off"
+    value = os.environ.get(_ENV_VAR, "").strip().lower()
+    if value in ("1", "on", "true", "yes"):
+        return "on"
     if value == "force":
         return "force"
-    if value not in ("", "1", "on", "true", "yes"):
-        print(f"[libero] {_ENV_VAR}={value!r} is not recognized; treating it as on.", file=sys.stderr)
-    return "on"
+    if value not in ("", "0", "false", "off", "no"):
+        print(f"[libero] {_ENV_VAR}={value!r} is not recognized; treating it as off.", file=sys.stderr)
+    return "off"
 
 
 def _so_name():

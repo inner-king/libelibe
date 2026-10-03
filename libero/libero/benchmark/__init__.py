@@ -2,6 +2,8 @@ import abc
 import os
 import glob
 import random
+import re
+import sys
 import torch
 
 from typing import List, NamedTuple, Type
@@ -182,6 +184,35 @@ task_orders = [
 ]
 
 
+class InitStatesUnavailable(RuntimeError):
+    """The task has no init states that are valid under the current mujoco physics."""
+
+
+_warned_original = set()
+
+
+def _init_states_source():
+    """'original' or 'mj314'.
+
+    LIBERO_INIT_STATES selects explicitly. Otherwise the init states settled for mujoco 3.x
+    (init_files_mj314) are used when the native mujoco >= 3.4 physics is active, i.e. the
+    mujoco 2.3.7 compat patch (LIBERO_MUJOCO_COMPAT) is not installed in this process.
+    """
+    value = os.environ.get("LIBERO_INIT_STATES", "").strip().lower()
+    if value in ("original", "mj314"):
+        return value
+    if value:
+        raise ValueError(f"LIBERO_INIT_STATES={value!r}: use 'original' or 'mj314'")
+    import mujoco
+
+    version = re.match(r"(\d+)\.(\d+)", mujoco.__version__)
+    if version is None or tuple(int(x) for x in version.groups()) < (3, 4):
+        return "original"
+    from libero.libero.envs import mujoco_compat
+
+    return "original" if mujoco_compat.status()["installed"] else "mj314"
+
+
 class Benchmark(abc.ABC):
     """A Benchmark."""
 
@@ -265,6 +296,29 @@ class Benchmark(abc.ABC):
         return self.task_embs[i]
 
     def get_task_init_states(self, i):
+        if _init_states_source() == "mj314":
+            path = os.path.join(
+                get_libero_path("benchmark_root"),
+                "init_files_mj314",
+                self.tasks[i].problem_folder,
+                self.tasks[i].init_states_file,
+            )
+            if os.path.exists(path):
+                return torch.load(path, weights_only=False)
+            if os.path.exists(path + ".excluded"):
+                with open(path + ".excluded") as f:
+                    reason = f.read().strip()
+                raise InitStatesUnavailable(
+                    f"{self.name} task {i} ({self.tasks[i].name}) has no init states for mujoco 3.x physics: "
+                    f"{reason} Skip this task, or set LIBERO_INIT_STATES=original to use the original init states."
+                )
+            if self.tasks[i].problem_folder not in _warned_original:
+                _warned_original.add(self.tasks[i].problem_folder)
+                print(
+                    f"[libero] no init_files_mj314 for {self.tasks[i].problem_folder}; using the original init "
+                    f"states, which were made for mujoco 2.3.x",
+                    file=sys.stderr,
+                )
         init_states_path = os.path.join(
             get_libero_path("init_states"),
             self.tasks[i].problem_folder,
