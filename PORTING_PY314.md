@@ -293,7 +293,10 @@ vertices by up to 9e-9 m.
   absolute difference of the 128x128 agentview frame against the recorded 2.3.7 observation: about 39 of 255 under 3.14,
   about 3 under 2.3.7; the other three suites: 0.02-1.5 under both). Policies trained on 2.3.7 images see a different
   floor in `libero_object` under 3.14, in both the native and the compat mode (the compat patch changes only contacts).
-  The regenerated demos are rendered by 3.14 and match what the policy sees at evaluation.
+  In the compiled 3.14 model the floor texture (`texplane`) has `tex_colorspace` sRGB (with the default
+  `colorspace="auto"`, mujoco reads the sRGB chunk of `light-gray-floor-tile.png`); mujoco 2.3.7 has no colorspace
+  handling. The `libero_object` floor fills most of the agentview image; in the other suites the table covers it. This
+  fork does not change it. The regenerated demos are rendered by 3.14 and match what the policy sees at evaluation.
 - Not checked: closed-loop policy success, mujoco 3.9-3.13 wheels.
 
 ## 7. Known LIBERO-PRO issues (verified, not fixed in this fork)
